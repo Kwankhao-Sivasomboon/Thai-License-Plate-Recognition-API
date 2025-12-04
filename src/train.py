@@ -87,23 +87,32 @@ def train_province_model():
 
     # 3. Model Setup
     model = ProvinceClassifier(len(train_ds.p2i)).to(DEVICE)
-    
-    # Load Checkpoint ถ้ามี
-    if Path("ocr_minimal/province_best.pth").exists():
+    best_f1 = 0.0
+    patience_counter = 0
+    start_epoch = 1
+
+    # โหลด Checkpoint
+    if Path("province_best.pth").exists():
         print(" Loading existing province model...")
         try:
-            ckpt = torch.load("ocr_minimal/province_best.pth", map_location=DEVICE)
-            state_dict = ckpt["model_state"]
+            ckpt = torch.load("province_best.pth", map_location=DEVICE)
             
+            # Load Model Weights (พร้อมแก้ Key ถ้าจำเป็น)
+            state_dict = ckpt["model_state"]
             new_state_dict = {}
             for k, v in state_dict.items():
                 if not k.startswith("model."):
-                    new_state_dict[f"model.{k}"] = v  # เติม model. นำหน้า
+                    new_state_dict[f"model.{k}"] = v 
                 else:
                     new_state_dict[k] = v
-            
             model.load_state_dict(new_state_dict)
-            print("  Model loaded successfully (with key adaptation)!")
+            
+            # 🌟 Load Best F1 (หัวใจสำคัญ)
+            # เราเช็คว่าในไฟล์มี key นี้ไหม ถ้ามีก็ดึงมาใช้เลย
+            if "best_f1" in ckpt:
+                best_f1 = ckpt["best_f1"]
+                
+            print(f"  Model loaded! Resuming with Best F1: {best_f1:.4f}")
             
         except Exception as e:
             print(f"  Load failed (Starting fresh): {e}")
@@ -115,9 +124,6 @@ def train_province_model():
     scaler = torch.amp.GradScaler('cuda', enabled=is_cuda)
 
     # 4. Training Loop
-    best_f1 = 0.0
-    patience_counter = 0
-    
     # Baseline Check
     model.eval()
     all_preds, all_labels_val = [], []
@@ -129,8 +135,12 @@ def train_province_model():
             preds = out.argmax(1).cpu().numpy()
             all_preds.extend(preds)
             all_labels_val.extend(labels.numpy())
-    best_f1 = f1_score(all_labels_val, all_preds, average='macro')
-    print(f" Baseline Val F1: {best_f1:.4f}")
+    current_val_f1 = f1_score(all_labels_val, all_preds, average='macro')
+    print(f" Baseline Val F1: {current_val_f1:.4f}")
+
+    if best_f1 == 0.0:
+        best_f1 = current_val_f1
+        print(f" initialized best_f1 to {best_f1:.4f}")
 
     for ep in range(EPOCHS):
         model.train()
@@ -178,13 +188,18 @@ def train_province_model():
         if val_f1 > best_f1:
             best_f1 = val_f1
             patience_counter = 0
-            # Save Model & Class Map
-            torch.save({"model_state": model.state_dict(), "class_map": train_ds.i2p}, "ocr_train_out/province_best.pth")
-            print("       Model Saved!")
+            torch.save({
+                "model_state": model.state_dict(),
+                "class_map": train_ds.i2p,
+                "best_f1": best_f1, 
+                "epoch": ep
+            }, "ocr_train_out/province_best.pth")
+            print(f"       Model Saved! (New Best F1: {best_f1:.4f})")
         else:
             patience_counter += 1
             if patience_counter >= EARLY_STOP:
-                print("Early Stopping.")
+                torch.save({"model_state": model.state_dict(), "class_map": train_ds.i2p}, "ocr_train_out/province_best.pth") 
+                print("Early Stopping. Saving latest model state before exit.")
                 break
 
 # --- 2. OCR Training ---
