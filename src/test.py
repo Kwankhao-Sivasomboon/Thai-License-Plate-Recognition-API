@@ -211,7 +211,7 @@ def main():
     # 5. Save Results
     if results:
         res_df = pd.DataFrame(results)
-        res_df.to_csv("final_results.csv", index=False, encoding="utf-8-sig")
+        res_df.to_csv("ocr_train_out/final_results.csv", index=False, encoding="utf-8-sig")
         
         avg_cer = res_df["cer"].mean()
         avg_acc = res_df["acc"].mean()
