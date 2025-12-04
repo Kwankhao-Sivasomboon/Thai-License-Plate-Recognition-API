@@ -1,0 +1,11 @@
+torch
+torchvision
+inference-sdk
+tqdm
+pillow
+pandas
+opencv-python
+matplotlib
+requests
+editdistance
+scikit-learn

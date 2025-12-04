@@ -1,0 +1,18 @@
+# 1. Virtual Environment
+venv/
+
+# 2. Dataset ที่แตกไฟล์ออกมา (มีรูปภาพเยอะ)
+OCR-Car-Plate_dataset/
+
+# 3. โมเดลและผลลัพธ์ที่มีขนาดใหญ่
+*.pth
+*.zip
+*.pyc
+__pycache__/
+
+# 4. ผลลัพธ์ที่สร้างขึ้นใหม่
+crops_all/
+final_results.csv
+train_unified.csv
+val_unified.csv
+test_unified.csv
