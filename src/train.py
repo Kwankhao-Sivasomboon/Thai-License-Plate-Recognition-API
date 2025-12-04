@@ -199,7 +199,7 @@ def train_ocr_model():
 
     with open(json_path, 'r', encoding='utf-8') as f:
         int_to_char = json.load(f)
-    char_to_int = {v:k for k,v in int_to_char.items()}
+    char_to_int = {v: int(k) for k, v in int_to_char.items()}
 
     # 2. Prepare Data
     if not TRAIN_UNIFIED.exists(): 
