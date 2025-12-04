@@ -17,7 +17,7 @@ from utils import best_path_decode
 
 # --- CONFIG ---
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {DEVICE}")
+print(f"\nUsing device: {DEVICE}")
 
 CROPS_ROOT = Path("crops_all")
 # ปรับลด Batch Size ตามความเหมาะสมของ GPU
@@ -92,10 +92,10 @@ def train_province_model():
     start_epoch = 1
 
     # โหลด Checkpoint
-    if Path("province_best.pth").exists():
+    if Path("ocr_minimal/province_best.pth").exists():
         print(" Loading existing province model...")
         try:
-            ckpt = torch.load("province_best.pth", map_location=DEVICE)
+            ckpt = torch.load("ocr_minimal/province_best.pth", map_location=DEVICE, weights_only=True)
             
             # Load Model Weights (พร้อมแก้ Key ถ้าจำเป็น)
             state_dict = ckpt["model_state"]
@@ -106,13 +106,6 @@ def train_province_model():
                 else:
                     new_state_dict[k] = v
             model.load_state_dict(new_state_dict)
-            
-            # 🌟 Load Best F1 (หัวใจสำคัญ)
-            # เราเช็คว่าในไฟล์มี key นี้ไหม ถ้ามีก็ดึงมาใช้เลย
-            if "best_f1" in ckpt:
-                best_f1 = ckpt["best_f1"]
-                
-            print(f"  Model loaded! Resuming with Best F1: {best_f1:.4f}")
             
         except Exception as e:
             print(f"  Load failed (Starting fresh): {e}")
@@ -247,7 +240,7 @@ def train_ocr_model():
     if OCR_PRETRAINED_PATH.exists():
         print(f" Loading existing OCR model from {OCR_PRETRAINED_PATH}...")
         try:
-            ckpt = torch.load(OCR_PRETRAINED_PATH, map_location=DEVICE)
+            ckpt = torch.load(OCR_PRETRAINED_PATH, map_location=DEVICE,weights_only=True)
             
             # OCR Model ถูกบันทึกด้วย Key: "model_state_dict" ใน Colab
             model.load_state_dict(ckpt["model_state_dict"])
@@ -348,5 +341,5 @@ def train_ocr_model():
 
 if __name__ == "__main__":
     # เลือกได้ว่าจะรันอะไร
-    # train_province_model()
-    train_ocr_model()
+    train_province_model()
+    #train_ocr_model()
