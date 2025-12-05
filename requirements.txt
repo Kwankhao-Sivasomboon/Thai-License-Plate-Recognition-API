@@ -14,4 +14,8 @@ matplotlib
 requests
 editdistance
 scikit-learn
+
+# Web/API Dependencies
 fastapi
+uvicorn
+python-multipart
