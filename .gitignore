@@ -5,12 +5,15 @@ venv/
 OCR-Car-Plate_dataset/
 
 # 3. โมเดลและผลลัพธ์ที่มีขนาดใหญ่
+*.jpg
+*.png
 *.pth
 *.zip
 *.pyc
 __pycache__/
 
 # 4. ผลลัพธ์ที่สร้างขึ้นใหม่
+debug_images/
 crops_all/
 final_results.csv
 train_unified.csv
