@@ -1,6 +1,6 @@
 # src/api_server.py
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from PIL import Image
+from PIL import Image, ImageOps
 import io
 import torch
 import json
@@ -9,6 +9,8 @@ import numpy as np
 from pathlib import Path
 import torchvision.transforms as T
 from inference_sdk import InferenceHTTPClient
+import time
+import os
 
 # Import Local Modules
 from src.models import ResNetCRNN, ProvinceClassifier
@@ -17,16 +19,18 @@ from src.utils import beam_search_decode
 app = FastAPI()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# --- CONFIG MODELS ---
-# Roboflow Models
+# --- CONFIG ---
 RF_API_KEY = "8Jx0yKiJpT5lb9rBGVzm"
-MODEL_1_ID = "car-plate-detection-ahcak/3"  # หาป้ายทะเบียน
-MODEL_2_ID = "ocr_prepare_test-tfc9g/4"     # หาตัวอักษร/จังหวัด ในป้าย
+MODEL_1_ID = "car-plate-detection-ahcak/3"
+MODEL_2_ID = "ocr_prepare_test-tfc9g/4"
 
-# Local Models
 OCR_PATH = Path("ocr_minimal/best_model.pth")
 PROV_PATH = Path("ocr_minimal/province_best.pth")
 CHAR_MAP = Path("ocr_minimal/int_to_char.json")
+
+# Debug Folder
+DEBUG_DIR = Path("debug_images")
+DEBUG_DIR.mkdir(exist_ok=True)
 
 # Global Vars
 rf_client = None
@@ -43,68 +47,77 @@ tf_prov = T.Compose([T.Resize((224, 224)), T.ToTensor(),
 @app.on_event("startup")
 async def startup_event():
     global rf_client, ocr_model, prov_model, int_to_char, prov_idx2prov
-    print("Server Starting... Loading Models...")
+    print("🚀 Server Starting... Loading Models...")
     
-    # 1. Setup Roboflow
     rf_client = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=RF_API_KEY)
     
-    # 2. Load Char Map
-    with open(CHAR_MAP, 'r', encoding='utf-8') as f:
-        int_to_char = json.load(f)
+    if CHAR_MAP.exists():
+        with open(CHAR_MAP, 'r', encoding='utf-8') as f:
+            int_to_char = json.load(f)
+            
+    if OCR_PATH.exists():
+        ocr_model = ResNetCRNN(1, len(int_to_char), hidden_size=256).to(DEVICE)
+        try:
+            ckpt = torch.load(OCR_PATH, map_location=DEVICE, weights_only=True)
+            state = ckpt['model_state_dict'] if 'model_state_dict' in ckpt else ckpt
+            ocr_model.load_state_dict(state)
+            ocr_model.eval()
+            print("✅ OCR Model Loaded")
+        except: pass
+
+    if PROV_PATH.exists():
+        try:
+            ckpt = torch.load(PROV_PATH, map_location=DEVICE, weights_only=True)
+            if 'class_map' in ckpt:
+                prov_map = ckpt['class_map']
+                prov_idx2prov = {int(k): v for k, v in prov_map.items()}
+                
+                prov_model = ProvinceClassifier(len(prov_idx2prov)).to(DEVICE)
+                state_dict = ckpt['model_state']
+                new_state_dict = {}
+                for k, v in state_dict.items():
+                    if not k.startswith("model."): new_state_dict[f"model.{k}"] = v
+                    else: new_state_dict[k] = v
+                prov_model.load_state_dict(new_state_dict)
+                prov_model.eval()
+                print("✅ Province Model Loaded")
+        except: pass
         
-    # 3. Load OCR Model
-    ocr_model = ResNetCRNN(1, len(int_to_char), hidden_size=256).to(DEVICE)
-    ocr_ckpt = torch.load(OCR_PATH, map_location=DEVICE)
-    ocr_model.load_state_dict(ocr_ckpt['model_state_dict'])
-    ocr_model.eval()
-    
-    # 4. Load Province Model
-    prov_ckpt = torch.load(PROV_PATH, map_location=DEVICE)
-    prov_map = prov_ckpt['class_map']
-    prov_idx2prov = {int(v): k for k, v in prov_map.items()} # เช็คทิศทาง Map อีกที
-    # หมายเหตุ: ต้องตรวจสอบว่า model_state มีคำว่า model. นำหน้าหรือไม่ ถ้ามีต้องแก้ key เหมือนตอน inference.py
-    # เพื่อความกระชับ ขอสมมติว่าโหลดได้ (ถ้าไม่ได้ ให้ใส่ Loop แก้ Key ตรงนี้)
-    
-    prov_model = ProvinceClassifier(len(prov_idx2prov)).to(DEVICE)
-    
-    # Auto-fix state dict keys
-    state_dict = prov_ckpt['model_state']
-    new_state_dict = {}
-    for k, v in state_dict.items():
-        if not k.startswith("model."): new_state_dict[f"model.{k}"] = v
-        else: new_state_dict[k] = v
-        
-    prov_model.load_state_dict(new_state_dict)
-    prov_model.eval()
-    
-    print("All Models Ready!")
+    print("✅ All Models Ready!")
 
 @app.post("/detect")
 async def detect_pipeline(file: UploadFile = File(...)):
-    # 1. Read Raw Image
+    # Generate Request ID for Debugging
+    req_id = int(time.time())
+    print(f"\n--- Processing Request ID: {req_id} ---")
+
+    # 1. Read Image
     image_data = await file.read()
-    raw_img = Image.open(io.BytesIO(image_data)).convert("RGB")
+    raw_img_rgb = Image.open(io.BytesIO(image_data)).convert("RGB")
     
-    # Save temp for Roboflow SDK (SDK ชอบ path file มากกว่า bytes)
-    raw_img.save("temp_raw.jpg")
+    # Debug 1: Save Raw
+    raw_img_rgb.save(DEBUG_DIR / f"{req_id}_0_raw.jpg")
+    
+    # Prepare Grayscale for Roboflow
+    raw_img_gray = raw_img_rgb.convert("L")
+    temp_raw_path = DEBUG_DIR / f"{req_id}_temp_raw_gray.jpg"
+    raw_img_gray.save(temp_raw_path)
     
     # ==========================================
     # STEP 1: Detect Plate (Model 1)
     # ==========================================
-    res_plate = rf_client.infer("temp_raw.jpg", model_id=MODEL_1_ID)
-    
-    # หา Box ที่มั่นใจที่สุดว่าเป็นป้ายทะเบียน
+    try:
+        res_plate = rf_client.infer(str(temp_raw_path), model_id=MODEL_1_ID)
+    except Exception as e:
+        return {"error": f"Model 1 Failed: {e}"}
+
     plate_box = None
     max_conf = 0
     for pred in res_plate['predictions']:
         if pred['confidence'] > max_conf:
             max_conf = pred['confidence']
-            # Convert Center-XYWH to Corner-XYXY
             x, y, w, h = pred['x'], pred['y'], pred['width'], pred['height']
-            plate_box = (
-                int(x - w/2), int(y - h/2), 
-                int(x + w/2), int(y + h/2)
-            )
+            plate_box = (int(x - w/2), int(y - h/2), int(x + w/2), int(y + h/2))
             
     if not plate_box:
         return {"status": "failed", "message": "No license plate found"}
@@ -112,61 +125,111 @@ async def detect_pipeline(file: UploadFile = File(...)):
     # ==========================================
     # STEP 2: Crop Plate
     # ==========================================
-    # Clamp coordinates (กันล้นขอบ)
-    W, H = raw_img.size
+    W, H = raw_img_rgb.size
     x1, y1, x2, y2 = plate_box
-    plate_img = raw_img.crop((max(0, x1), max(0, y1), min(W, x2), min(H, y2)))
-    plate_img.save("temp_plate.jpg") # Save for Model 2
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(W, x2), min(H, y2)
+    
+    # Crop RGB (เก็บไว้ใช้ตอนท้ายถ้าต้อง Fallback)
+    plate_img_rgb = raw_img_rgb.crop((x1, y1, x2, y2))
+    
+    # Crop Gray (ส่งไป Model 2)
+    plate_img_gray = plate_img_rgb.convert("L")
+    temp_plate_path = DEBUG_DIR / f"{req_id}_temp_plate_gray.jpg"
+    plate_img_gray.save(temp_plate_path)
+    
+    # Debug 2: Save Plate Crop
+    plate_img_rgb.save(DEBUG_DIR / f"{req_id}_1_crop_plate.jpg")
 
     # ==========================================
-    # STEP 3: Detect License & Province (Model 2)
+    # STEP 3: Detect Components (Model 2)
     # ==========================================
-    res_components = rf_client.infer("temp_plate.jpg", model_id=MODEL_2_ID)
+    try:
+        res_components = rf_client.infer(str(temp_plate_path), model_id=MODEL_2_ID)
+    except:
+        res_components = {'predictions': []}
     
     license_crop = None
     province_crop = None
     
-    # Loop หา component ภายในป้าย
-    # คาดหวัง Class name: "license", "province" (เช็คใน Roboflow อีกที)
+    pW, pH = plate_img_rgb.size
+    
     for pred in res_components['predictions']:
         cls = pred['class']
         x, y, w, h = pred['x'], pred['y'], pred['width'], pred['height']
         box = (int(x - w/2), int(y - h/2), int(x + w/2), int(y + h/2))
         
-        # Crop ย่อยจากภาพ Plate
-        pW, pH = plate_img.size
-        component_img = plate_img.crop((max(0, box[0]), max(0, box[1]), min(pW, box[2]), min(pH, box[3])))
+        bx1, by1 = max(0, box[0]), max(0, box[1])
+        bx2, by2 = min(pW, box[2]), min(pH, box[3])
         
-        if "license" in cls or "text" in cls: # แก้ชื่อ Class ตามจริง
+        # Crop จาก RGB
+        component_img = plate_img_rgb.crop((bx1, by1, bx2, by2))
+        
+        if "Plate" in cls:
             license_crop = component_img
-        elif "province" in cls: # แก้ชื่อ Class ตามจริง
+        elif "Province" in cls:
             province_crop = component_img
 
     # ==========================================
-    # STEP 4: Recognition (Local Models)
+    # STEP 4: Recognition & Debug Saving
     # ==========================================
-    result = {"plate": "", "province": ""}
+    result = {
+        "RequestID": req_id,
+        "Plate": "", 
+        "Province": "", 
+        "Conf_Prov": 0.0,
+        "Method": ""
+    }
     
-    # 4.1 Recognize Characters
-    if license_crop:
-        gray = license_crop.convert("L")
-        ts = tf_ocr(gray).unsqueeze(0).to(DEVICE)
-        with torch.no_grad():
-            out = ocr_model(ts)
-            text = beam_search_decode(out.log_softmax(-1), int_to_char)
-        result["plate"] = text
-        
-    # 4.2 Recognize Province
-    if province_crop:
-        rgb = province_crop.convert("RGB")
-        ts = tf_prov(rgb).unsqueeze(0).to(DEVICE)
-        with torch.no_grad():
-            out = prov_model(ts)
-            idx = out.argmax(1).item()
-            prov_name = prov_idx2prov.get(idx, str(idx))
-        result["province"] = prov_name
-    else:
-        # Fallback: ถ้า Model 2 หาจังหวัดไม่เจอ อาจจะใช้ Heuristic Crop เหมือนเดิมก็ได้
-        result["province"] = "Not Detected"
+    # --- 4.1 OCR ---
+    img_for_ocr = license_crop if license_crop else plate_img_rgb
+    
+    # Debug 3: Save OCR Input
+    img_for_ocr.save(DEBUG_DIR / f"{req_id}_2_input_ocr.jpg")
+    
+    if img_for_ocr:
+        try:
+            gray = img_for_ocr.convert("L")
+            ts = tf_ocr(gray).unsqueeze(0).to(DEVICE)
+            with torch.no_grad():
+                out = ocr_model(ts)
+                text = beam_search_decode(out[0].log_softmax(-1), int_to_char)
+            result["Plate"] = text
+        except Exception as e:
+            print(f"OCR Error: {e}")
+
+    # --- 4.2 Province ---
+    img_for_prov = province_crop
+    result["Method"] = "Roboflow"
+    
+    if not img_for_prov:
+        # Fallback: Heuristic (35% ล่าง)
+        img_for_prov = plate_img_rgb.crop((0, int(pH*0.65), pW, pH))
+        result["Method"] = "Heuristic (Fallback)"
+
+    # Debug 4: Save Province Input
+    img_for_prov.save(DEBUG_DIR / f"{req_id}_3_input_prov.jpg")
+
+    if img_for_prov:
+        try:
+            # Fake RGB (Gray -> RGB) เพื่อลด Noise สีที่ไม่จำเป็น
+            # แต่ถ้าเทรนด้วย RGB รอบหน้า ให้ลบ .convert("L") ออก
+            rgb_fake = img_for_prov.convert("L").convert("RGB")
+            
+            ts = tf_prov(rgb_fake).unsqueeze(0).to(DEVICE)
+            with torch.no_grad():
+                out = prov_model(ts)
+                probs = torch.softmax(out, dim=1)
+                conf, idx = probs.max(1)
+                prov_name = prov_idx2prov.get(idx.item(), str(idx.item()))
+                
+            result["Province"] = prov_name
+            result["Conf_Prov"] = float(conf.item())
+        except Exception as e:
+            print(f"Province Error: {e}")
+
+    # Clean up temp files
+    if os.path.exists(temp_raw_path): os.remove(temp_raw_path)
+    if os.path.exists(temp_plate_path): os.remove(temp_plate_path)
 
     return result
