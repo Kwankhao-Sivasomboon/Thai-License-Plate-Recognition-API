@@ -43,13 +43,13 @@
  
 ทำการ Build Docker Image โดยใช้ `Dockerfile` ที่อยู่ใน Root Directory:
  
-```bash
+```
 docker build -t asia-southeast1-docker.pkg.dev/[PROJECT_ID]/ocr-api-repo/ocr-api-image:latest .
 ```
 ### 2. การ Deploy ไปยัง Google Cloud Run (GCP)
 
 หลังจากยืนยันสิทธิ์ gcloud auth configure-docker แล้ว สามารถ Deploy Image ไปยัง GCP Cloud Run ได้ทันที
-
+```
 gcloud run deploy ocr-api-service \
   --image asia-southeast1-docker.pkg.dev/[PROJECT_ID]/ocr-api-repo/ocr-api-image:latest \
   --platform managed \
@@ -58,3 +58,4 @@ gcloud run deploy ocr-api-service \
   --cpu 1 \
   --memory 512Mi \
   --max-instances 1
+```
