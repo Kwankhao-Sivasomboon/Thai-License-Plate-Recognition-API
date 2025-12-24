@@ -1,62 +1,40 @@
-# 🇹🇭 Thai License Plate Recognition API (End-to-End MLOps)
- 
-**สถานะ:** Production Ready (Deployed on GCP Cloud Run)
- 
-## ภาพรวมโครงการ (Project Overview)
- 
-โครงการนี้คือการพัฒนา API สำหรับระบบรู้จำป้ายทะเบียนรถยนต์ไทยแบบครบวงจร (End-to-End OCR Pipeline) โดยเน้นที่การสร้างสถาปัตยกรรมที่สามารถนำไปใช้งานจริง (Production-Grade) ด้วยแนวคิด **MLOps**
- 
-ระบบใช้โมเดล Deep Learning ทำงานร่วมกัน เพื่อให้ได้ความแม่นยำสูงทั้งการตรวจจับตำแหน่งและการรู้จำตัวอักษร
- 
-### จุดเด่นทางเทคนิคที่สำคัญ (Key Technical Highlights)
- 
-* **Two-Tier Detection:** ใช้ **Roboflow 3.0 Object Detection** ในการหาป้ายทะเบียน และใช้ **RF-DETR (Medium)** ในการแยกตัวอักษรและจังหวัดเพื่อ Segmentation
-* **Custom Deep Learning:** พัฒนาโมเดล **CRNN** คู่กับ **CTC Loss** สำหรับการรู้จำตัวอักษรภาษาไทยโดยเฉพาะ
-* **Containerization & Deployment:** ใช้ **Docker** และ Deploy เป็น Serverless Microservice บน **Google Cloud Run (GCP)**
- 
----
- 
-## Technical Stack
- 
-| Category | Tools & Frameworks |
-| :--- | :--- |
-| **Deep Learning** | **PyTorch**, **CRNN** (Recognition), **CTC Loss**, Roboflow Inference SDK |
-| **API / MLOps** | **Docker**, **FastAPI**, **Google Cloud Platform (GCP)**, Pipelining |
-| **Language** | Python (Advanced), OpenCV |
- 
----
- 
-## สถาปัตยกรรม (Hybrid 4-Stage Pipeline)
- 
-ระบบถูกออกแบบให้ทำงานเป็น Pipeline แบบ Multi-stage เพื่อเพิ่มความแม่นยำ:
- 
-1.  **Stage 1: Initial Detection:** ใช้ **Roboflow 3.0 Object Detection** ระบุตำแหน่งของแผ่นป้ายทะเบียนในภาพ Raw Image
-2.  **Stage 2: Text Segmentation:** ใช้ **RF-DETR (Medium)** ครอบแยกตัวอักษร/เลขทะเบียน และจังหวัดจากป้ายที่ถูกตรวจจับมา
-3.  **Stage 3: Recognition (OCR):** นำภาพที่ถูกแยกแล้วเข้าสู่โมเดล **CRNN** (ฝึกฝนด้วย **CTC Loss**) แปลงภาพเป็นข้อความ
-4.  **Stage 4: Classification:** จำแนกหมวดหมู่จังหวัด (Optional Stage)
- 
----
- 
-## การใช้งานและการ Deploy (MLOps Workflow)
- 
-### 1. การ Build Docker Image
- 
-ทำการ Build Docker Image โดยใช้ `Dockerfile` ที่อยู่ใน Root Directory:
- 
-```
-docker build -t asia-southeast1-docker.pkg.dev/simai-ocr-api-dev/ocr-api-repo/simai-thai-lpr-api:v2.3 .
-```
-### 2. การ Deploy ไปยัง Google Cloud Run (GCP)
 
-หลังจากยืนยันสิทธิ์ gcloud auth configure-docker แล้ว สามารถ Deploy Image ไปยัง GCP Cloud Run ได้ทันที
+# Thai License Plate Recognition API
+
+A high-performance microservice for Thai license plate detection and recognition. This system utilizes a multi-stage deep learning pipeline to extract plate numbers and province names from images.
+
+## Features
+- Plate Detection and Segmentation using YOLO11.
+- Custom OCR (CRNN) specialized for Thai characters.
+- Province Classification using MobileNetV2.
+- Ready-to-deploy FastAPI backend.
+- Dockerized for cloud deployment.
+
+## Tech Stack
+- AI/ML: PyTorch, Ultralytics (YOLO11), OpenCV.
+- Backend: FastAPI, Uvicorn.
+- Infrastructure: Docker, GCP Cloud Run.
+
+## Architecture
+1. Detection: Locate the license plate in the image.
+2. Segmentation: Separate the plate number and province area.
+3. Recognition: OCR for characters and Classification for province.
+
+## Quick Start
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Run the API:
+   ```bash
+   uvicorn src.api_server:app --reload
+   ```
+
+## Docker Deployment
+```bash
+docker build -t thai-lpr-api .
+docker run -p 8080:8080 thai-lpr-api
 ```
-gcloud run deploy simai-lpr-service \
-    --image asia-southeast1-docker.pkg.dev/simai-ocr-api-dev/ocr-api-repo/simai-thai-lpr-api:v2.3 \
-    --platform managed \
-    --region [asia-southeast1] \
-    --allow-unauthenticated \
-    --cpu 1 \
-    --memory 1Gi \
-    --min-instances=0 \
-    --timeout=600
-```
+
+---
+Developed for professional Thai license plate recognition tasks.
