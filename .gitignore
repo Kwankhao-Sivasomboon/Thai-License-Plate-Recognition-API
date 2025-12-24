@@ -11,6 +11,7 @@ venv/
 
 # Models & Data
 weights/*.pt
+weights/*.pth
 !weights/.gitkeep
 yolo_datasets/
 crops_all/
