@@ -15,13 +15,6 @@ OUTPUT_ROOT = PROJECT_ROOT / "crops_all"
 CLS_PLATE = 0    
 CLS_PROV = 1     
 
-def clean_filename(fname):
-    """Normalize filename."""
-    stem = Path(fname).stem
-    if ".rf." in stem:
-        stem = stem.split(".rf.")[0]
-    return stem.lower().strip()
-
 def yolo_to_bbox(line, img_w, img_h):
     """Convert YOLO format line (box or polygon) to [x1, y1, x2, y2]"""
     parts = line.split()
@@ -57,7 +50,6 @@ def process_split(split_name):
 
     records = []
     
-    # Gather Images
     img_files = []
     for ext in ["*.jpg", "*.png", "*.jpeg"]:
         img_files.extend(list(img_dir.glob(ext)))
@@ -67,8 +59,6 @@ def process_split(split_name):
     count_processed = 0
     
     for img_path in tqdm(img_files):
-        # 1. Image Path -> Label Path
-        # Assumes label has same stem as image
         lbl_path = lbl_dir / f"{img_path.stem}.txt"
         
         if not lbl_path.exists():
@@ -84,10 +74,8 @@ def process_split(split_name):
         plate_crop = None
         prov_crop = None
         
-        # 2. Extract Crops
         for line in lines:
             cls, bbox = yolo_to_bbox(line, w, h)
-            # Safe crop with boundary check
             x1, y1, x2, y2 = bbox
             crop = img[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
             
@@ -98,22 +86,19 @@ def process_split(split_name):
             elif cls == CLS_PROV: 
                 prov_crop = crop
         
-        # 3. Save Crops and Record
-        base_id = clean_filename(img_path.name)
-        
         if plate_crop is not None:
-            save_name_plate = f"{base_id}_plate.jpg"
+            base_name = img_path.stem
+            save_name_plate = f"{base_name}_plate.jpg"
             cv2.imwrite(str(out_plate_dir / save_name_plate), plate_crop)
             
-            # Default empty labels (User will fill or use pre-existing logic later)
             record = {
                 "image": f"{split_name}/plates/{save_name_plate}",
-                "gt_plate": "",    # Placeholder
-                "gt_province": ""  # Placeholder
+                "gt_plate": "",    
+                "gt_province": ""  
             }
             
             if prov_crop is not None:
-                save_name_prov = f"{base_id}_prov.jpg"
+                save_name_prov = f"{base_name}_prov.jpg"
                 cv2.imwrite(str(out_prov_dir / save_name_prov), prov_crop)
                 
             records.append(record)
@@ -130,10 +115,8 @@ def main():
             records = process_split(split)
             
             if records:
-                # Save CSV Template
                 df = pd.DataFrame(records)
                 csv_filename = f"{split}_unified.csv"
-                if split == "valid": csv_filename = "val_unified.csv"
                 
                 out_csv_path = OUTPUT_ROOT / split / csv_filename
                 df.to_csv(out_csv_path, index=False, encoding='utf-8-sig')
