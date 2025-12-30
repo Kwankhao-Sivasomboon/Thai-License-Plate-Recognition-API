@@ -4,9 +4,9 @@ from src.config import cfg
 from pathlib import Path
 
 def train_detection(epochs=100):
-    print("\nStarting Model 1: Detection")
+    print("\nModel 1: Detection")
     
-    data_path = cfg.PROJECT_ROOT / "yolo_datasets" / "detection" / "data.yaml"
+    data_path = Path(cfg.PROJECT_ROOT / "yolo_datasets" / "detection" / "data.yaml")
     if not data_path.exists():
         print(f"Data file not found: {data_path}")
         return
@@ -25,12 +25,11 @@ def train_detection(epochs=100):
         erasing=0.0,
         mosaic=1.0,
     )
-    print("Detection Training Completed.")
 
 def train_segmentation(epochs=100):
-    print("\nStarting Model 2: Segmentation")
+    print("\nModel 2: Segmentation")
     
-    data_path = cfg.PROJECT_ROOT / "yolo_datasets" / "segmentation" / "data.yaml"
+    data_path = Path(cfg.PROJECT_ROOT / "yolo_datasets" / "segmentation" / "data.yaml")
     if not data_path.exists():
         print(f"Data file not found: {data_path}")
         return
@@ -49,7 +48,6 @@ def train_segmentation(epochs=100):
         hsv_v=0.0,
         mosaic=1.0,
     )
-    print("Segmentation Training Completed.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
