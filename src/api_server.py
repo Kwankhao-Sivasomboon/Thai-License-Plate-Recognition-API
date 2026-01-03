@@ -43,7 +43,7 @@ class LicensePlateService:
 
         # 2. Load Engine Models (OCR & Province) with Embedded Maps
         self.ocr_model, self.int_to_char = self._load_ocr_engine()
-        self.prov_model, self.i2p = self._load_prov_engine()
+        self.prov_model, self.int_to_char_prov = self._load_prov_engine()
         
         # 3. Transforms
         self.tf_ocr = get_ocr_transforms(is_train=False)
@@ -74,13 +74,13 @@ class LicensePlateService:
             
         ckpt = torch.load(cfg.PROV_MODEL_SAVE_PATH, map_location=self.device)
         class_map = ckpt.get("class_map", {})
-        i2p = {int(k) if str(k).isdigit() else k: v for k, v in class_map.items()}
+        int_to_char = {int(k) if str(k).isdigit() else k: v for k, v in class_map.items()}
         state_dict = ckpt.get("model_state", ckpt.get("model", ckpt))
         
         model = ProvinceClassifier(n_classes=len(class_map)).to(self.device)
         model.load_state_dict(state_dict)
         model.eval()
-        return model, i2p
+        return model, int_to_char
 
     async def predict(self, image_bytes):
         # Clear debug dir for new request
@@ -155,7 +155,7 @@ class LicensePlateService:
                 out_prov = self.prov_model(ts_prov)
                 probs = F.softmax(out_prov, dim=1)
                 p_conf, p_idx = probs.max(1)
-                province_name = self.i2p.get(p_idx.item(), "Unknown")
+                province_name = self.int_to_char_prov.get(p_idx.item(), "Unknown")
                 conf_prov = float(p_conf.item())
 
             detections.append({

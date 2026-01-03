@@ -10,23 +10,27 @@ class ResNetCRNN(nn.Module):
     def __init__(self, img_channel=1, num_classes=46, hidden_size=256, num_rnn_layers=2, dropout_rnn=0.3):
         super().__init__()
         
-        # 1. Backbone (ResNet18)
         resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-
-        # Modify Input for Grayscale
         resnet.conv1 = nn.Conv2d(img_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
-        # Modify Strides to preserve Width (Time dimension)
         resnet.layer2[0].conv1.stride = (2, 1)
         resnet.layer2[0].downsample[0].stride = (2, 1)
+        
         resnet.layer3[0].conv1.stride = (2, 1)
         resnet.layer3[0].downsample[0].stride = (2, 1)
+        
         resnet.layer4[0].conv1.stride = (2, 1)
         resnet.layer4[0].downsample[0].stride = (2, 1)
 
         self.cnn = nn.Sequential(
-            resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool,
-            resnet.layer1, resnet.layer2, resnet.layer3, resnet.layer4
+            resnet.conv1, 
+            resnet.bn1, 
+            resnet.relu, 
+            resnet.maxpool,
+            resnet.layer1, 
+            resnet.layer2, 
+            resnet.layer3, 
+            resnet.layer4
         )
 
         # 2. RNN Head

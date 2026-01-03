@@ -59,7 +59,7 @@ def main():
     if isinstance(prov_ckpt, dict) and "class_map" in prov_ckpt:
         class_map = prov_ckpt["class_map"]
         # Ensure correct mapping {Index: ProvName}
-        i2p = {int(k) if str(k).isdigit() else k: v for k, v in class_map.items()}
+        int_to_char_prov = {int(k) if str(k).isdigit() else k: v for k, v in class_map.items()}
         print(f" ✅ Using EMBEDDED class map from checkpoint ({len(class_map)} classes)")
     else:
         print(" ❌ Error: Province checkpoint must contain 'class_map'")
@@ -118,7 +118,7 @@ def main():
                     t_img = tf_prov(img).unsqueeze(0).to(cfg.DEVICE)
                     output = prov_model(t_img)
                     idx = output.argmax(1).item()
-                    pred_prov = i2p.get(idx, "Unknown")
+                    pred_prov = int_to_char_prov.get(idx, "Unknown")
                 except Exception as e:
                     pass
 

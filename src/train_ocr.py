@@ -67,9 +67,9 @@ class ProvinceTrainer:
                 print(f" Warning: Could not read class map: {e}")
 
         # Init Datasets
-        self.train_ds_real = ProvinceDataset(self.train_df, cfg.CROPS_DIR, class_map=forced_map, training=True)
+        self.train_ds_real = ProvinceDataset(self.train_df, cfg.CROPS_DIR, char_map=forced_map, transform=get_prov_transforms(is_train=True))
         self.train_ds = self.train_ds_real # Real only for fine-tuning
-        self.val_ds = ProvinceDataset(self.val_df, cfg.CROPS_DIR, class_map=self.train_ds_real.p2i, training=False)
+        self.val_ds = ProvinceDataset(self.val_df, cfg.CROPS_DIR, char_map=self.train_ds_real.char_map, transform=get_prov_transforms(is_train=False))
         
         # Init Loaders
         is_cuda = (self.device.type == 'cuda')
@@ -79,7 +79,7 @@ class ProvinceTrainer:
                                    num_workers=cfg.NUM_WORKERS, pin_memory=is_cuda)
 
         # Init Model
-        self.model = ProvinceClassifier(len(self.train_ds_real.p2i)).to(self.device)
+        self.model = ProvinceClassifier(len(self.train_ds_real.char_map)).to(self.device)
         
         # Load Weights
         if load_source:
@@ -96,7 +96,7 @@ class ProvinceTrainer:
 
     def _setup_optimization(self):
         # Class Weights for imbalance handling
-        master_map = self.train_ds_real.p2i
+        master_map = self.train_ds_real.char_map
         all_labels = [master_map.get(row["gt_province"], 0) for _, row in self.train_df.iterrows()]
         class_counts = np.bincount(all_labels, minlength=len(master_map))
         class_counts = np.where(class_counts == 0, 1, class_counts)
@@ -115,7 +115,7 @@ class ProvinceTrainer:
         
         for ep in range(self.start_epoch, cfg.EPOCHS):
             self.model.train()
-            self.train_ds.training = True
+
             
             # Freeze BN for stability on small batches
             for m in self.model.modules():
@@ -160,7 +160,7 @@ class ProvinceTrainer:
 
     def validate(self):
         self.model.eval()
-        self.val_ds.training = False
+
         all_preds, all_labels = [], []
         
         with torch.no_grad():
@@ -176,7 +176,7 @@ class ProvinceTrainer:
     def save_checkpoint(self, epoch, f1):
         torch.save({
             "model_state": self.model.state_dict(),
-            "class_map": self.train_ds.i2p,
+            "class_map": self.train_ds.int_to_char,
             "best_f1": f1,
             "epoch": epoch
         }, cfg.PROV_MODEL_SAVE_PATH)
@@ -197,9 +197,9 @@ class OCRTrainer:
         train_df = pd.read_csv(cfg.TRAIN_CSV).fillna("")
         val_df = pd.read_csv(cfg.VAL_CSV).fillna("")
         
-        self.train_ds_real = OCRDataset(train_df, cfg.CROPS_DIR, self.char_to_int, transform=get_ocr_transforms(True))
+        self.train_ds_real = OCRDataset(train_df, cfg.CROPS_DIR, char_map=self.char_to_int, transform=get_ocr_transforms(True))
         self.train_ds = self.train_ds_real # Real only for fine-tuning
-        self.val_ds = OCRDataset(val_df, cfg.CROPS_DIR, self.char_to_int, transform=get_ocr_transforms(False))
+        self.val_ds = OCRDataset(val_df, cfg.CROPS_DIR, char_map=self.char_to_int, transform=get_ocr_transforms(False))
         
         is_cuda = (self.device.type == 'cuda')
         self.train_loader = DataLoader(self.train_ds, batch_size=cfg.BATCH_SIZE_OCR, shuffle=True,
