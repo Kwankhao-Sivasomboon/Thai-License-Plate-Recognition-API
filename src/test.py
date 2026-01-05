@@ -30,7 +30,7 @@ def main():
     
     with open(cfg.CHAR_MAP_PATH, 'r', encoding='utf-8') as f:
         int_to_char = json.load(f)
-    print(f" ✅ Using char map from {cfg.CHAR_MAP_PATH} ({len(int_to_char)} chars)")
+    print(f" Using char map from {cfg.CHAR_MAP_PATH} ({len(int_to_char)} chars)")
 
     # ดึง Weights จากห่อ
     if isinstance(ocr_ckpt, dict):
@@ -41,7 +41,7 @@ def main():
     ocr_model = ResNetCRNN(img_channel=1, num_classes=len(int_to_char)).to(cfg.DEVICE)
     ocr_model.load_state_dict(state_dict)
     ocr_model.eval()
-    print(" ✅ OCR Model Weights Loaded")
+    print(" OCR Model Weights Loaded")
 
     # --- Province ---
     print("Loading Province Model and Embedded Class Map...")
@@ -57,18 +57,18 @@ def main():
         return
     with open(cfg.PROV_MAP_PATH, 'r', encoding='utf-8') as f:
         int_to_char_prov = json.load(f)
-    print(f" ✅ Using class map from {cfg.PROV_MAP_PATH} ({len(int_to_char_prov)} classes)")
+    print(f" Using class map from {cfg.PROV_MAP_PATH} ({len(int_to_char_prov)} classes)")
 
     # ดึง Weights จากห่อ
     state_dict = prov_ckpt.get("model_state", prov_ckpt.get("model", prov_ckpt))
     prov_model = ProvinceClassifier(n_classes=len(int_to_char_prov)).to(cfg.DEVICE)
     prov_model.load_state_dict(state_dict)
     prov_model.eval()
-    print(" ✅ Province Model Weights Loaded")
+    print(" Province Model Weights Loaded")
 
     # 3. Load Test Data
     if not cfg.TEST_CSV.exists():
-        print(f"❌ Test CSV not found: {cfg.TEST_CSV}")
+        print(f"Test CSV not found: {cfg.TEST_CSV}")
         return
         
     test_df = pd.read_csv(cfg.TEST_CSV).fillna("")
