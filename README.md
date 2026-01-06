@@ -41,6 +41,3 @@ A high-performance microservice for Thai license plate detection and recognition
 docker build -t thai-lpr-api .
 docker run -p 8080:8080 thai-lpr-api
 ```
-
----
-Developed for professional Thai license plate recognition tasks.
