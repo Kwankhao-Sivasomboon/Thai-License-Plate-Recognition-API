@@ -15,10 +15,13 @@ debug_api/
 debug_images/
 yolo_train_runs/
 
-# Large Model Files (Unless needed for inference, handle with care)
-# If you download weights inside Dockerfile or mount them, ignore them here.
-# But for now, we assume we COPY weights/ folder.
-# weights/*.pt (Only ignore if you download at runtime)
+# Large Model Files
+# We do NOT ignore weights/ because we COPY them in Dockerfile
+# But we can ignore temporary training backups if any
+weights/last.pt
+weights/best_epoch_*.pt
 
+# Testing & Docs
 test_evaluation_results.csv
 README.md
+RESUME.docx

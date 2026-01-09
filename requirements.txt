@@ -9,11 +9,5 @@ ultralytics
 opencv-python-headless
 pillow
 numpy
-pandas
 editdistance
 requests
-
-# --- Training / ML Utils ---
-scikit-learn
-matplotlib
-tqdm

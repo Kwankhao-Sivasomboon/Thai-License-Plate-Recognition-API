@@ -11,28 +11,26 @@ import os
 from ultralytics import YOLO
 import torch.nn.functional as F
 
-# Import Config และ Modules
 from src.config import cfg
 from src.models import ResNetCRNN, ProvinceClassifier, best_path_decode
 from src.preprocess import preprocess_raw_api_image, get_ocr_transforms, get_prov_transforms
 
-import shutil
+# import shutil
 
 app = FastAPI(title="Thai LPR API Service")
 
-# Setup Debug Directory
-DEBUG_API_DIR = cfg.DEBUG_IMAGE_DIR
+# DEBUG_API_DIR = cfg.DEBUG_IMAGE_DIR
 
 class LicensePlateService:
     def __init__(self):
         print("Initializing Local LPR Service (Synced with latest models)...")
         self.device = cfg.DEVICE
         
-        # Ensure debug directory exists
-        if DEBUG_API_DIR.exists():
-            shutil.rmtree(DEBUG_API_DIR)
-        DEBUG_API_DIR.mkdir(parents=True, exist_ok=True)
-        
+        # if DEBUG_API_DIR.exists():
+        #     shutil.rmtree(DEBUG_API_DIR)
+        # DEBUG_API_DIR.mkdir(parents=True, exist_ok=True)
+
+
         # 1. Load Local YOLO Models
         try:
             self.model_plate = YOLO(cfg.MODEL_DETECTION_PATH)
@@ -83,16 +81,15 @@ class LicensePlateService:
         return model, int_to_char
 
     async def predict(self, image_bytes):
-        # Clear debug dir for new request
-        if DEBUG_API_DIR.exists():
-            for f in DEBUG_API_DIR.glob("*"):
-                if f.is_file(): f.unlink()
+        # if DEBUG_API_DIR.exists():
+        #     for f in DEBUG_API_DIR.glob("*"):
+        #         if f.is_file(): f.unlink()
         
         start_time = time.time()
         raw_img = preprocess_raw_api_image(image_bytes)
         if raw_img is None:
             return {"status": "error", "message": "Failed to decode image bytes"}
-        raw_img.save(DEBUG_API_DIR / "0_input_raw.jpg")
+        # raw_img.save(DEBUG_API_DIR / "0_input_raw.jpg")
 
         # 1. YOLO Plate Detect
         results_plate = self.model_plate(raw_img, verbose=False)[0]
@@ -104,7 +101,7 @@ class LicensePlateService:
             conf_plate = float(box.conf[0])
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
             plate_crop = raw_img.crop((x1, y1, x2, y2))
-            plate_crop.save(DEBUG_API_DIR / f"1_plate_crop_{i}.jpg")
+            # plate_crop.save(DEBUG_API_DIR / f"1_plate_crop_{i}.jpg")
 
             # 2. YOLO Component
             results_comp = self.model_comp(plate_crop, verbose=False)[0]
@@ -120,10 +117,10 @@ class LicensePlateService:
                 
                 if "Plate" in cls_name: 
                     ocr_crop = comp_img
-                    ocr_crop.save(DEBUG_API_DIR / f"2_ocr_target_{i}.jpg")
+                    # ocr_crop.save(DEBUG_API_DIR / f"2_ocr_target_{i}.jpg")
                 elif "Province" in cls_name: 
                     prov_crop = comp_img
-                    prov_crop.save(DEBUG_API_DIR / f"3_prov_target_{i}.jpg")
+                    # prov_crop.save(DEBUG_API_DIR / f"3_prov_target_{i}.jpg")
 
             # Fallback crops logic (if YOLO components fail)
             pW, pH = plate_crop.size
@@ -132,11 +129,11 @@ class LicensePlateService:
                 
             if not prov_crop: 
                 prov_crop = plate_crop.crop((0, int(pH*0.6), pW, pH))
-                prov_crop.save(DEBUG_API_DIR / f"3_prov_target_{i}_fallback.jpg")
+                # prov_crop.save(DEBUG_API_DIR / f"3_prov_target_{i}_fallback.jpg")
 
             # PREPROCESSING ENHANCEMENT
             ocr_crop = ImageOps.autocontrast(ocr_crop, cutoff=1)
-            ocr_crop.save(DEBUG_API_DIR / f"2_ocr_target_{i}_enhanced.jpg")
+            # ocr_crop.save(DEBUG_API_DIR / f"2_ocr_target_{i}_enhanced.jpg")
 
             # 3. Engines Inference
             plate_text = ""
