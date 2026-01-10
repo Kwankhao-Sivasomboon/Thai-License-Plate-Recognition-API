@@ -4,10 +4,17 @@ uvicorn
 python-multipart
 python-dotenv
 
-# --- Logic & Processing ---
+# --- AI & ML Core ---
 ultralytics
+torch
+torchvision
+
+# --- Logic & Data Processing ---
 opencv-python-headless
 pillow
 numpy
+pandas
 editdistance
 requests
+tqdm
+scikit-learn
