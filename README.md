@@ -36,8 +36,16 @@ A high-performance microservice for Thai license plate detection and recognition
    uvicorn src.api_server:app --reload
    ```
 
-## Docker Deployment
+## Docker & GCP Deployment
 ```bash
-docker build -t thai-lpr-api .
-docker run -p 8080:8080 thai-lpr-api
+gcloud projects create [PROJECT_NAME]
+gcloud config set project [PROJECT_NAME]
+gcloud services enable artifactregistry.googleapis.com
+gcloud services enable run.googleapis.com
+gcloud artifacts repositories create [REPO_NAME] [CONFIG_REPO]
+gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+docker build -t asia-southeast1-docker.pkg.dev/[PROJECT_ID]/[REPO_NAME]/[IMAGE_NAME] .
+docker tag [OLD_TAG] [NEW_TAG]
+docker push [TAG]
+gcloud run deploy [IMAGE_NAME] [CONFIG_SERVER]
 ```
