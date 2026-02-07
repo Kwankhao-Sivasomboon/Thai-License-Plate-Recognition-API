@@ -17,7 +17,11 @@ A high-performance microservice for Thai license plate detection and recognition
 ## Result Screenshot
 | Detection | Segmentation | Recognition |
 |:---------:|:---------:|:------------------:|
-| ![val_batch2_pred](https://github.com/user-attachments/assets/74c61b4c-eb9b-498e-bde5-82208c755cb5) | ![val_batch1_pred](https://github.com/user-attachments/assets/25f84e37-ec9d-4b36-9509-ac83e88542de) | ![WorKflow-LPR](https://github.com/user-attachments/assets/8cdd4102-4634-4643-9d15-3ad4c0c2c7a0) |
+| ![val_batch2_pred](https://github.com/user-attachments/assets/74c61b4c-eb9b-498e-bde5-82208c755cb5) | ![val_batch1_pred](https://github.com/user-attachments/assets/25f84e37-ec9d-4b36-9509-ac83e88542de) | ![VXYN4PVMMABQQ9MS_plate](https://github.com/user-attachments/assets/53b2a447-5be9-4156-a105-a37288ab8b22) ![VXYN4PVMMABQQ9MS_prov](https://github.com/user-attachments/assets/f1c72e7e-fc41-4773-88aa-63aa42c942ca) |
+
+| WorkFlow |
+|:------------------:|
+| ![WorKflow-LPR](https://github.com/user-attachments/assets/8cdd4102-4634-4643-9d15-3ad4c0c2c7a0) |
 
 ## Docker & GCP Deployment
 ```bash
