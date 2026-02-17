@@ -188,11 +188,32 @@ class OCRTrainer:
         self.char_to_int = {v: int(k) for k, v in self.int_to_char.items()}
         
         self._prepare_data()
-        self.best_cer = 1.0
+        self.best_cer = 1.0 # Legacy metric, just in case
+        self.best_score = 100.0 # Score = CER + (1 - FmtAcc)
         self.start_epoch = 0
         
         self._setup_model()
         self._setup_weight()
+
+# ... (omitted) ...
+
+        avg_cer = cer_sum / max(1, tot)
+        fmt_acc = valid_format_count / max(1, tot)
+        
+        print(f"       [Val] Format Valid Rate: {fmt_acc:.2%} ({valid_format_count}/{tot})")
+        
+        return avg_cer, fmt_acc
+
+    def save_checkpoint(self, epoch, cer, fmt_acc):
+        torch.save({
+            "model_state_dict": self.model.state_dict(),
+            "int_to_char": self.int_to_char,
+            "epoch": epoch,
+            "cer": cer,
+            "fmt_acc": fmt_acc,
+            "score": self.best_score
+        }, cfg.OCR_MODEL_SAVE_PATH)
+        print("       Model Saved!")
 
     def _prepare_data(self):
         train_df_raw = pd.read_csv(cfg.TRAIN_CSV).fillna("")
@@ -272,17 +293,25 @@ class OCRTrainer:
                 pbar.set_postfix(loss=f"{loss.item():.4f}")
             
             # Validation
-            val_cer = self.validate()
-            self.scheduler.step(val_cer)
+            val_cer, val_fmt_acc = self.validate()
             
-            if val_cer < self.best_cer:
-                self.best_cer = val_cer
+            # Combined Score for Model Selection:
+            # We want to Minimize CER (0 is best) and Maximize Format Acc (1 is best)
+            # Let's define a metric: Score = CER + (1.0 - Format_Acc)
+            # Lower score is better.
+            combined_score = val_cer + (1.0 - val_fmt_acc)
+            
+            self.scheduler.step(combined_score)
+            
+            if combined_score < self.best_score:
+                self.best_score = combined_score
+                self.best_cer = val_cer # Just for memory
                 patience = 0
-                self.save_checkpoint(ep, val_cer)
-                print(f"   └── CER: {val_cer:.4f} (New Best!)")
+                self.save_checkpoint(ep, val_cer, val_fmt_acc)
+                print(f"   └── Score: {combined_score:.4f} (CER: {val_cer:.4f}, Fmt: {val_fmt_acc:.2%}) -> New Best!")
             else:
                 patience += 1
-                print(f"   └── CER: {val_cer:.4f} (Best: {self.best_cer:.4f}) [Patience: {patience}/{cfg.EARLY_STOPPING_PATIENCE}]")
+                print(f"   └── Score: {combined_score:.4f} (Best: {self.best_score:.4f}) [Patience: {patience}/{cfg.EARLY_STOPPING_PATIENCE}]")
                 if patience >= cfg.EARLY_STOPPING_PATIENCE:
                     print("Early stopping triggered.")
                     break
