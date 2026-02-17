@@ -82,6 +82,9 @@ class LPREvaluator:
         print(f"\nEvaluating: {csv_path}")
         df = pd.read_csv(csv_path).fillna("")
         results, missing_count = [], 0
+        from src.validators import is_valid_plate
+
+        valid_format_count = 0
         
         for row in tqdm(df.itertuples(index=False), total=len(df), desc="Testing"):
             p_plate = self.predict_ocr(Path(crops_dir) / row.image)
@@ -94,17 +97,23 @@ class LPREvaluator:
             res_plate, res_prov = p_plate or "", p_prov or ""
             gt_plate, gt_prov = str(row.gt_plate).strip(), str(row.gt_province).strip()
             
+            # Check Format
+            is_valid_fmt = is_valid_plate(res_plate)
+            if is_valid_fmt: valid_format_count += 1
+
             results.append({
                 "image": row.image,
                 "gt_plate": gt_plate, "pred_plate": res_plate,
                 "gt_prov": gt_prov, "pred_prov": res_prov,
                 "cer": editdistance.eval(res_plate, gt_plate) / max(1, len(gt_plate)),
-                "prov_acc": 1 if res_prov == gt_prov else 0
+                "prov_acc": 1 if res_prov == gt_prov else 0,
+                "is_valid_format": is_valid_fmt
             })
         
         res_df = pd.DataFrame(results)
         print(f"\nResults: Samples={len(res_df)}, Missing={missing_count}")
         print(f"OCR CER: {res_df['cer'].mean():.4f}, Prov Acc: {res_df['prov_acc'].mean()*100:.2f}%")
+        print(f"Strict Format Valid Rate: {valid_format_count/len(res_df):.2%} ({valid_format_count}/{len(res_df)})")
         return res_df
 
 if __name__ == "__main__":

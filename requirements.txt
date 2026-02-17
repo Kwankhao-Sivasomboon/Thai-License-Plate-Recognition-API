@@ -18,3 +18,4 @@ editdistance
 requests
 tqdm
 scikit-learn
+pydantic

@@ -6,6 +6,13 @@ import pandas as pd
 import numpy as np
 import random
 from pathlib import Path
+try:
+    from src.validators import is_valid_plate
+except ImportError:
+    # Fallback if running from a different context where src is not in path
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from validators import is_valid_plate
 
 
 class OCRDataset(Dataset):

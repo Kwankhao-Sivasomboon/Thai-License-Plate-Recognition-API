@@ -8,7 +8,7 @@ import json
 import numpy as np
 import time
 import os
-from ultralytics import YOLO
+from ultralytics import YOLO # type: ignore
 import torch.nn.functional as F
 
 from src.config import cfg
@@ -141,15 +141,15 @@ class LicensePlateService:
             conf_prov = 0.0
 
             # OCR Inference
-            ts_ocr = self.tf_ocr(ocr_crop).unsqueeze(0).to(self.device)
+            ts_ocr = self.tf_ocr(ocr_crop).unsqueeze(0).to(self.device) # type: ignore
             with torch.no_grad():
-                out_ocr = self.ocr_model(ts_ocr)
+                out_ocr = self.ocr_model(ts_ocr) # type: ignore
                 plate_text = best_path_decode(out_ocr.softmax(-1), self.int_to_char)[0]
 
             # Province Inference
-            ts_prov = self.tf_prov(prov_crop).unsqueeze(0).to(self.device)
+            ts_prov = self.tf_prov(prov_crop).unsqueeze(0).to(self.device) # type: ignore
             with torch.no_grad():
-                out_prov = self.prov_model(ts_prov)
+                out_prov = self.prov_model(ts_prov) # type: ignore
                 probs = F.softmax(out_prov, dim=1)
                 p_conf, p_idx = probs.max(1)
                 province_name = self.int_to_char_prov.get(p_idx.item(), "Unknown")
@@ -181,7 +181,7 @@ async def startup_event():
 @app.post("/detect")
 async def detect_endpoint(file: UploadFile = File(...)):
     image_data = await file.read()
-    return await service.predict(image_data)
+    return await service.predict(image_data) # type: ignore
 
 if __name__ == "__main__":
     import uvicorn

@@ -15,6 +15,7 @@ weights/*.pth
 yolo_datasets/
 crops_all/
 yolo_train_runs/
+CarPlateDetect_DATASETs/
 
 # Logs & Debug
 *.log

@@ -13,14 +13,14 @@ class ResNetCRNN(nn.Module):
         resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
         resnet.conv1 = nn.Conv2d(img_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
-        resnet.layer2[0].conv1.stride = (2, 1)
-        resnet.layer2[0].downsample[0].stride = (2, 1)
+        resnet.layer2[0].conv1.stride = (2, 1) # type: ignore
+        resnet.layer2[0].downsample[0].stride = (2, 1) # type: ignore
         
-        resnet.layer3[0].conv1.stride = (2, 1)
-        resnet.layer3[0].downsample[0].stride = (2, 1)
+        resnet.layer3[0].conv1.stride = (2, 1) # type: ignore
+        resnet.layer3[0].downsample[0].stride = (2, 1) # type: ignore
         
-        resnet.layer4[0].conv1.stride = (2, 1)
-        resnet.layer4[0].downsample[0].stride = (2, 1)
+        resnet.layer4[0].conv1.stride = (2, 1) # type: ignore
+        resnet.layer4[0].downsample[0].stride = (2, 1) # type: ignore
 
         self.cnn = nn.Sequential(
             resnet.conv1, 

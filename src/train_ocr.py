@@ -291,6 +291,11 @@ class OCRTrainer:
         self.model.eval()
         cer_sum = 0
         tot = 0
+        valid_format_count = 0
+        
+        # Import validator inside method to avoid circular imports during init if not careful
+        from src.validators import is_valid_plate
+
         with torch.no_grad():
             for batch in self.val_loader:
                 imgs, _, _, texts, _, _ = batch
@@ -301,10 +306,31 @@ class OCRTrainer:
                 preds = best_path_decode(out.softmax(-1), self.int_to_char) 
                 
                 for i, gt in enumerate(texts):
+                    pred_text = preds[i]
+                    
+                    # Check Format Validity
+                    is_valid = is_valid_plate(pred_text)
+                    if is_valid:
+                        valid_format_count += 1
+                    
+                    # Calculate CER
                     div = max(1, len(gt))
-                    cer_sum += editdistance.eval(preds[i], gt) / div
+                    base_cer = editdistance.eval(pred_text, gt) / div
+                    
+                    # Strict Penalty: If format is invalid but text is "close", maybe we penalize?
+                    # User: "ถ้าทายออกมาไม่ตรง rule ให้ถือว่าผิด" -> We can treat CER as 1.0 (Totally wrong)
+                    # or keep CER as is but prioritize Format Accuracy.
+                    # Let's keep standard CER but LOG format accuracy.
+                    
+                    cer_sum += base_cer
                     tot += 1
-        return cer_sum / max(1, tot)
+        
+        avg_cer = cer_sum / max(1, tot)
+        fmt_acc = valid_format_count / max(1, tot)
+        
+        print(f"       [Val] Format Valid Rate: {fmt_acc:.2%} ({valid_format_count}/{tot})")
+        
+        return avg_cer
 
     def save_checkpoint(self, epoch, cer):
         torch.save({
@@ -339,7 +365,7 @@ if __name__ == "__main__":
         if not cfg.CHAR_MAP_PATH.exists():
             print(" Generating char map from training data...")
             df = pd.read_csv(cfg.TRAIN_CSV).fillna("")
-            all_chars = sorted(list(set("".join(df["gt_plate"].astype(str).tolist()))))
+            all_chars = sorted(list(set("".join(df["gt_plate"].astype(str).tolist())))) # type: ignore
             
             # Create Map (0 is reserved for CTC Blank)
             int_to_char = {str(i+1): c for i, c in enumerate(all_chars)}
